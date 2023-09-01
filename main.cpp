@@ -60,6 +60,9 @@ uint8_t rx_buffer[30];
  */
 DS1820  ds1820(PC_9);
 
+// Fro controlling TCXO on/off
+DigitalOut tcxoEn(PA_12);
+
 /**
 * This event queue is the global event queue for both the
 * application and stack. To conserve memory, the stack is designed to run
@@ -94,6 +97,9 @@ int main(void)
 {
     // setup tracing
     setup_trace();
+
+    // Enable TCXO
+    tcxoEn = 1;
 
     // stores the status of a call to LoRaWAN protocol
     lorawan_status_t retcode;
@@ -145,6 +151,25 @@ int main(void)
     return 0;
 }
 
+void activateSpi()
+{
+    SPI _spi(MBED_CONF_SX1276_LORA_DRIVER_SPI_MOSI, 
+            MBED_CONF_SX1276_LORA_DRIVER_SPI_MISO, 
+            MBED_CONF_SX1276_LORA_DRIVER_SPI_SCLK);
+    _spi.select();
+    _spi.deselect();
+}
+
+void deactivateSpi()
+{
+    DigitalIn spi_pin1(MBED_CONF_SX1276_LORA_DRIVER_SPI_MOSI, PullNone); 
+    DigitalIn spi_pin2(MBED_CONF_SX1276_LORA_DRIVER_SPI_MISO, PullNone); 
+    DigitalIn spi_pin3(MBED_CONF_SX1276_LORA_DRIVER_SPI_SCLK, PullNone);
+    spi_pin1.read();
+    spi_pin2.read();
+    spi_pin3.read();
+}
+
 /**
  * Sends a message to the Network Server
  */
@@ -153,6 +178,9 @@ static void send_message()
     uint16_t packet_len;
     int16_t retcode;
     int32_t sensor_value;
+    
+    activateSpi(); // Activate SPI
+    tcxoEn = 1; // Enable TCXO
 
     if (ds1820.begin()) {
         ds1820.startConversion();
@@ -218,6 +246,8 @@ static void lora_event_handler(lorawan_event_t event)
     switch (event) {
         case CONNECTED:
             printf("\r\n Connection - Successful \r\n");
+            deactivateSpi(); // Deactivate SPI
+            tcxoEn = 0; // Disable TCXO
             if (MBED_CONF_LORA_DUTY_CYCLE_ON) {
                 send_message();
             } else {
@@ -231,6 +261,8 @@ static void lora_event_handler(lorawan_event_t event)
             break;
         case TX_DONE:
             printf("\r\n Message Sent to Network Server \r\n");
+            deactivateSpi(); // Deactivate SPI
+            tcxoEn = 0; // Disable TCXO
             if (MBED_CONF_LORA_DUTY_CYCLE_ON) {
                 send_message();
             }
