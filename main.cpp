@@ -100,6 +100,8 @@ int main(void)
 
     // Enable TCXO
     tcxoEn = 1;
+    // Disable console RX to unlock deep sleep (BufferedSerial RX interrupt handler locks deep sleep)
+    mbed_file_handle(STDIN_FILENO)->enable_input(false);
 
     // stores the status of a call to LoRaWAN protocol
     lorawan_status_t retcode;
